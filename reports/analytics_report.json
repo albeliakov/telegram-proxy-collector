@@ -1,20 +1,20 @@
 {
-  "timestamp": "2026-10-11T16:11:06.538734+00:00",
+  "timestamp": "2026-10-11T21:35:25.958475+00:00",
   "metrics": {
     "total": 200,
     "pings_count": 200,
-    "median_ping": 0.092,
+    "median_ping": 0.091,
     "mean_ping": 0.085,
-    "stdev_ping": 0.02,
-    "good_thr": 0.092,
-    "bad_thr": 0.23,
-    "good": 124,
-    "medium": 76,
+    "stdev_ping": 0.021,
+    "good_thr": 0.091,
+    "bad_thr": 0.227,
+    "good": 122,
+    "medium": 78,
     "bad": 0,
     "regions": {
-      "us": 42,
+      "us": 32,
       "eu": 116,
-      "ru": 40,
+      "ru": 50,
       "asia": 2
     },
     "types": {
@@ -26,10 +26,10 @@
     "recommended_max_ping": 1.5,
     "recommended_workers": 100,
     "current_avg_ping": 0.085,
-    "current_median_ping": 0.092,
-    "current_stdev_ping": 0.02,
+    "current_median_ping": 0.091,
+    "current_stdev_ping": 0.021,
     "total_proxies": 200,
-    "trend_median_ping": -0.025,
+    "trend_median_ping": -0.001,
     "trend_direction": "stable"
   },
   "anomalies_count": 10,
