@@ -1,6 +1,5 @@
-# MTProto ASIA (3)
-# Updated: 2026-10-10 21:14:58.099828+00:00
+# MTProto ASIA (2)
+# Updated: 2026-10-11 00:43:06.951524+00:00
 
-tg://proxy?server=103.161.35.23&port=443&secret=3XnnAQIAAQAH8AMDhuJMOt0
 tg://proxy?server=103.161.35.56&port=443&secret=3XnnAQIAAQAH8AMDhuJMOt0
-tg://proxy?server=45.43.92.97&port=443&secret=eed451f808fd60ed2c45f11d38fdbc87c56363632e6e657669732d7072696d652e696e666f
+tg://proxy?server=103.161.35.23&port=443&secret=3XnnAQIAAQAH8AMDhuJMOt0
