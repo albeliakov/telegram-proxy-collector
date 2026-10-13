@@ -18,6 +18,13 @@ import json
 import os
 import argparse
 from typing import Optional, Set, List, Dict, Any, Tuple
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger(__name__)
 
 # ---------- GEOIP ----------
 geoip_reader = None
@@ -270,14 +277,17 @@ def get_proxies_from_text(text: str) -> Set[Tuple[str, str, int, Any]]:
     return proxies
 
 def fetch_source(session: requests.Session, url: str, timeout: int = 15) -> str:
-    for _ in range(3):
+    """Fetch proxy source with exponential backoff and proper timeouts."""
+    for attempt in range(3):
         try:
             r = session.get(url, timeout=timeout)
             if r.status_code == 200:
                 return r.text
-        except requests.RequestException:
-            pass
-        time.sleep(0.5)
+        except requests.Timeout:
+            logger.debug(f"Timeout fetching {url} (attempt {attempt + 1})")
+        except requests.RequestException as exc:
+            logger.debug(f"Error fetching {url} (attempt {attempt + 1}): {exc}")
+        time.sleep(0.5 * (2 ** attempt))
     return ''
 
 def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Dict[str, Any]]:
@@ -289,7 +299,7 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
     if typ == 'mtproto' and port in SUSPICIOUS_PORTS:
         return None
 
-    # GeoIP нужен дважды: сначала для фильтра страны, потом для региона
+    # GeoIP needs: filter country and determine region
     country = None
     if geoip_reader is not None:
         country = _geo_country(host)
@@ -316,16 +326,18 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
         domain_str = ''
 
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            s.settimeout(timeout)
+        with socket.create_connection((host, port), timeout=timeout) as s:
             start = time.time()
-            s.connect((host, port))
+            s.settimeout(timeout)
             ping = round(time.time() - start, 3)
+        # Quality score: lower ping = higher score
+        quality_score = max(0, min(100, int(100 - ping * 50)))
         return {
             'type': typ, 'host': host, 'port': port,
             'secret': extra if typ == 'mtproto' else None,
             'link': link, 'ping': ping, 'region': region,
-            'domain': domain_str, 'method': 'TCP_OK', 'probe_resistant': False
+            'domain': domain_str, 'method': 'TCP_OK', 'probe_resistant': False,
+            'quality_score': quality_score
         }
     except (socket.timeout, socket.error, OSError, TypeError):
         return None
@@ -340,6 +352,7 @@ def deduplicate_and_sort(proxies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
             unique.append(p)
     unique.sort(key=lambda x: (
         0 if (x['type'] == 'mtproto' and x.get('probe_resistant', False)) else 1 if x['type'] == 'mtproto' else 2,
+        -x.get('quality_score', 0),
         x['ping']
     ))
     return unique
@@ -479,6 +492,13 @@ def run(args):
         print('\n⚠️ Нечего проверять после фильтрации. Завершение.')
         return
 
+    if args.dry_run:
+        print('\n🧪 DRY-RUN: собрано прокси, TCP-проверка пропущена.')
+        print(f'   Уникальных прокси: {len(all_raw)}')
+        print(f"   MTProto: {sum(1 for x in all_raw if x[0] == 'mtproto')}")
+        print(f"   SOCKS5: {sum(1 for x in all_raw if x[0] == 'socks5')}")
+        return
+
     print(f'\n⚡ Проверка {len(all_raw)} прокси (TCP ping)...\n')
     valid = []
     checked = 0
@@ -594,6 +614,7 @@ def main():
     parser.add_argument('--max-check', type=int, default=30000)
     parser.add_argument('--seen-file', type=str, default='verified/seen.json')
     parser.add_argument('--seen-ttl', type=int, default=48)
+    parser.add_argument('--dry-run', action='store_true', help='Only collect and parse proxies, skip TCP verification')
     args = parser.parse_args()
     run(args)
 
