@@ -1,5 +1,11 @@
 {
   "sources": [
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_ru.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_eu.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_us.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_asia.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_all_mtproto.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_all.txt",
     "https://raw.githubusercontent.com/SoliSpirit/mtproto/master/all_proxies.txt",
     "https://raw.githubusercontent.com/Grim1313/mtproto-for-telegram/refs/heads/master/all_proxies.txt",
     "https://raw.githubusercontent.com/ALIILAPRO/MTProtoProxy/main/mtproto.txt",
@@ -8,7 +14,6 @@
     "https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.txt",
     "https://raw.githubusercontent.com/Freedom-Guard/Proxy/main/proxies/mtproto.txt",
     "https://raw.githubusercontent.com/securemanager/MTPROTO/main/proxies.txt",
-    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/mtproto_proxies.txt",
     "https://raw.githubusercontent.com/seriyps/mtproto_proxy/master/proxies.txt",
     "https://raw.githubusercontent.com/MTProto/MTProtoProxy/master/proxies/mtproto.txt",
     "https://raw.githubusercontent.com/mtProtoProxy/MTProxy-official/master/proxies.txt",
@@ -41,6 +46,7 @@
     "https://moonlunavpn.com/proxies.json",
     "https://tgmtproxy.github.io/mtproxy/proxies.txt",
     "https://tgmtproxy.github.io/mtproxy/proxies.json",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/socks5.txt",
     "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
     "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=5000&country=all",
     "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
@@ -51,5 +57,5 @@
     "https://raw.githubusercontent.com/CB-X2-Jun/proxy-lists/main/public/proxies.json",
     "https://raw.githubusercontent.com/ProxyScrape/free-proxy-list/refs/heads/main/proxies/all/data.txt"
   ],
-  "last_update": "2026-10-14T11:01:34.953240+00:00"
+  "last_update": "2026-10-14T14:55:53.882572+00:00"
 }
