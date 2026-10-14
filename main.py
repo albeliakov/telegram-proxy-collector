@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# MTProto & SOCKS5 Proxy Collector v4.0
+# MTProto & SOCKS5 Proxy Collector v4.1
 # - FIX: регион определяется по GeoIP (ISO-коду страны), а не только по домену в secret
 # - FIX: GeoIP: maxminddb.open_database + fallback на geoip2
 # - Расширенный фильтр подозрительных портов (Tomcat, Minecraft, RDP…)
 # - Расширенный ALLOWED_COUNTRIES: Азия, Ближний Восток, Мексика
 # - FIX: seen-кэш учитывает secret
+# - FIX: decode_domain корректно пропускает 34 символа (ee + 32 hex secret) перед чтением домена
+# - ADD: источники kort0881/telegram-proxy-collector (regional + all + socks5)
+# - ADD: MANUAL_PROXIES — всегда проверяемые прокси
 
 import requests
 import re
@@ -58,33 +61,43 @@ ASIA_COUNTRIES = {'JP', 'KR', 'SG', 'HK', 'IN', 'TW', 'PH', 'MY', 'ID', 'VN', 'T
 
 # Порты, которые НЕ бывают MTProto
 SUSPICIOUS_PORTS = {
-    # Системные
     21, 22, 23, 25, 53, 110, 111, 135, 139, 143, 161, 162,
     389, 445, 465, 514, 587, 631, 993, 995,
-    # БД и кэши
     1433, 1521, 2049, 3306, 5432, 5900, 6379, 9200, 11211, 27017,
-    # Веб и прочее
     80, 1080, 3389,
-    # Tomcat, Minecraft, прочие VPS
     8009, 8080, 8443, 25565,
 }
 
 ALLOWED_COUNTRIES = {
-    # СНГ + Восточная Европа
     'RU','BY','KZ','UA','MD','AM','GE','AZ','UZ','KG','TJ','TM',
-    # Западная Европа
     'DE','NL','FI','GB','FR','SE','PL','CZ','AT','CH','IT','ES',
     'NO','DK','BE','IE','LU','EE','LV','LT','PT','GR','RO','BG',
     'HU','SK','SI','HR','RS','TR',
-    # Северная Америка
     'CA','US','MX',
-    # Азия + Ближний Восток
     'JP','KR','SG','HK','IN','TW','PH','MY','ID','VN','TH','MN',
     'CN','MO','AE','SA','IL','PK','BD','NP','LK','KH','MM','LA','BN',
 }
 
+# ---------- Ручные прокси (проверяются всегда) ----------
+MANUAL_PROXIES = [
+    "tg://proxy?server=iriguchi.proxy.rlwy.net&port=45066&secret=eebb8410139359861806644276b18735327777772e636c6f7564666c6172652e636f6d",
+    "tg://proxy?server=shortline.proxy.rlwy.net&port=36077&secret=ee31fcc7de872ddee361f1217d9a0377e17777772e636c6f7564666c6172652e636f6d",
+    "tg://proxy?server=monorail.proxy.rlwy.net&port=52938&secret=654e03cc7529c0da7164ecad503d9d0d",
+    "tg://proxy?server=monorail.proxy.rlwy.net&port=52938&secret=dd654e03cc7529c0da7164ecad503d9d0d",
+    "tg://proxy?server=ballast.proxy.rlwy.net&port=31126&secret=e8fa724103180483b35921b1d926118a",
+]
+
 # ---------- Источники ----------
 SOURCES = [
+    # --- твой репозиторий kort0881/telegram-proxy-collector ---
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_ru.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_eu.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_us.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_asia.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_all_mtproto.txt",
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/proxy_all.txt",
+
+    # --- внешние источники ---
     "https://raw.githubusercontent.com/SoliSpirit/mtproto/master/all_proxies.txt",
     "https://raw.githubusercontent.com/Grim1313/mtproto-for-telegram/refs/heads/master/all_proxies.txt",
     "https://raw.githubusercontent.com/ALIILAPRO/MTProtoProxy/main/mtproto.txt",
@@ -93,7 +106,6 @@ SOURCES = [
     "https://raw.githubusercontent.com/hookzof/socks5_list/master/tg/mtproto.txt",
     "https://raw.githubusercontent.com/Freedom-Guard/Proxy/main/proxies/mtproto.txt",
     "https://raw.githubusercontent.com/securemanager/MTPROTO/main/proxies.txt",
-    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/mtproto_proxies.txt",
     "https://raw.githubusercontent.com/seriyps/mtproto_proxy/master/proxies.txt",
     "https://raw.githubusercontent.com/MTProto/MTProtoProxy/master/proxies/mtproto.txt",
     "https://raw.githubusercontent.com/mtProtoProxy/MTProxy-official/master/proxies.txt",
@@ -129,6 +141,10 @@ SOURCES = [
 ]
 
 SOCKS_SOURCES = [
+    # --- твой репозиторий ---
+    "https://raw.githubusercontent.com/kort0881/telegram-proxy-collector/main/socks5.txt",
+
+    # --- внешние ---
     "https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt",
     "https://api.proxyscrape.com/v2/?request=displayproxies&protocol=socks5&timeout=5000&country=all",
     "https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt",
@@ -151,7 +167,6 @@ def _is_blocked(secret: str, domain: Optional[str]) -> bool:
     return len(secret) < 16 or (domain and any(b in domain for b in BLOCKED))
 
 def _region_from_country(iso_code: Optional[str]) -> str:
-    """Превращает ISO-код страны в регион сайта."""
     if not iso_code:
         return 'eu'
     code = iso_code.upper()
@@ -161,7 +176,6 @@ def _region_from_country(iso_code: Optional[str]) -> str:
     return 'eu'
 
 def _detect_region(domain: Optional[str]) -> str:
-    """Определяет регион по домену внутри secret. Если домена нет — EU (потом GeoIP уточнит)."""
     if not domain:
         return 'eu'
     d = domain.lower()
@@ -171,16 +185,32 @@ def _detect_region(domain: Optional[str]) -> str:
     return 'eu'
 
 def decode_domain(secret: str) -> Optional[str]:
-    if not secret or not secret.startswith('ee'):
+    """
+    MTProto secret формата 'ee...':
+      'ee' (2 hex) + 32 hex-символа secret (16 байт) + hex-encoded domain.
+    Домен начинается с позиции 34.
+    """
+    if not secret:
+        return None
+    s = secret.lower()
+    if not s.startswith('ee') or len(s) <= 34:
         return None
     try:
+        hex_domain = s[34:]
         chars = []
-        for i in range(2, len(secret) - 1, 2):
-            v = int(secret[i:i+2], 16)
-            if v == 0: break
+        for i in range(0, len(hex_domain) - 1, 2):
+            pair = hex_domain[i:i+2]
+            if len(pair) < 2:
+                break
+            v = int(pair, 16)
+            if v == 0:
+                break
             if 32 <= v <= 126:
                 chars.append(chr(v))
-        return ''.join(chars).lower() or None
+            else:
+                break
+        domain = ''.join(chars).strip().lower()
+        return domain or None
     except (ValueError, IndexError):
         return None
 
@@ -277,7 +307,6 @@ def get_proxies_from_text(text: str) -> Set[Tuple[str, str, int, Any]]:
     return proxies
 
 def fetch_source(session: requests.Session, url: str, timeout: int = 15) -> str:
-    """Fetch proxy source with exponential backoff and proper timeouts."""
     for attempt in range(3):
         try:
             r = session.get(url, timeout=timeout)
@@ -299,7 +328,6 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
     if typ == 'mtproto' and port in SUSPICIOUS_PORTS:
         return None
 
-    # GeoIP needs: filter country and determine region
     country = None
     if geoip_reader is not None:
         country = _geo_country(host)
@@ -312,8 +340,6 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
         if _is_blocked(secret, domain):
             return None
         link = f'tg://proxy?server={host}&port={port}&secret={secret}'
-        # 1) если в secret зашит домен — определяем регион по нему
-        # 2) иначе — по ISO-коду страны из GeoIP
         if domain:
             region = _detect_region(domain)
         else:
@@ -321,7 +347,6 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
         domain_str = domain or ''
     else:
         link = f'tg://socks?server={host}&port={port}'
-        # SOCKS5 тоже раскладываем по регионам через GeoIP
         region = _region_from_country(country)
         domain_str = ''
 
@@ -330,7 +355,6 @@ def check_proxy_tcp(p: Tuple[str, str, int, Any], timeout: float) -> Optional[Di
             start = time.time()
             s.settimeout(timeout)
             ping = round(time.time() - start, 3)
-        # Quality score: lower ping = higher score
         quality_score = max(0, min(100, int(100 - ping * 50)))
         return {
             'type': typ, 'host': host, 'port': port,
@@ -421,7 +445,7 @@ def run(args):
     global geoip_reader
 
     start_time = time.time()
-    print('🚀 MTProxy Collector v4.0')
+    print('🚀 MTProxy Collector v4.1')
     print('=' * 48)
 
     if args.geoip and os.path.exists(args.geoip):
@@ -465,6 +489,12 @@ def run(args):
             print(f'  ✓ {name:<42} +{cnt} SOCKS5')
         else:
             print(f'  ✗ {name:<42} недоступен')
+
+    # MANUAL_PROXIES — всегда
+    if MANUAL_PROXIES:
+        manual_parsed = get_proxies_from_text('\n'.join(MANUAL_PROXIES))
+        all_raw.update(manual_parsed)
+        print(f'\n📌 MANUAL_PROXIES: +{len(manual_parsed)} (из {len(MANUAL_PROXIES)} строк)')
 
     if args.manual:
         all_raw.update(load_local_proxies(args.manual))
@@ -572,6 +602,7 @@ def run(args):
         },
         "top": top,
         "geoip_mode": GEOIP_MODE,
+        "manual_count": len(MANUAL_PROXIES),
     }
     with open(f'{args.output_dir}/proxy_stats_verified.json', 'w', encoding='utf-8') as f:
         json.dump(stats, f, indent=2, ensure_ascii=False)
@@ -585,6 +616,7 @@ def run(args):
         f.write(f"Total proxies checked: {total}\n")
         f.write(f"Valid proxies found: {len(valid)}\n")
         f.write(f"Top saved: {top}\n")
+        f.write(f"Manual proxies: {len(MANUAL_PROXIES)}\n")
 
     domain_proxies = [p for p in all_proxies if p.get('domain')]
     with open(f'{args.output_dir}/proxy_domain_verified.txt', 'w', encoding='utf-8') as f:
@@ -604,7 +636,7 @@ def run(args):
     print('=' * 48)
 
 def main():
-    parser = argparse.ArgumentParser(description="MTProto & SOCKS5 Proxy Collector v4.0")
+    parser = argparse.ArgumentParser(description="MTProto & SOCKS5 Proxy Collector v4.1")
     parser.add_argument('--timeout', type=float, default=2.0)
     parser.add_argument('--workers', type=int, default=100)
     parser.add_argument('--top', type=int, default=0)
